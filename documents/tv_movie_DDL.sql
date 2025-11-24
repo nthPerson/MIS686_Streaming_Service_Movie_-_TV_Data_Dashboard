@@ -1,4 +1,6 @@
--- Optional: create and select a database for this project
+-- Copy all of the code from this file and run in MySQL Workbench to create the database tables
+
+-- create and select a database for this project
 CREATE DATABASE IF NOT EXISTS streaming_media_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
