@@ -25,17 +25,22 @@ import re
 import argparse
 import sys
 from datetime import datetime
+import os
+
+# Load environment variables from /.env/
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '../', '.env'))
 
 # ===============================
 # 1. DB CONNECTION CONFIG
 # ===============================
 
 DB_CONFIG = {
-    "host": "localhost",          # <-- CHANGE ME
-    "port": 3306,                 # <-- CHANGE ME if needed
-    "user": "movie_tv_db_user",      # <-- CHANGE ME
-    "password": "movie_tv_db_user_password",  # <-- CHANGE ME
-    "database": "streaming_media_db"  # <-- CHANGE ME if you used a different DB name
+    "host": os.getenv("DB_HOST", "localhost"),  # Default to 'localhost' if not set
+    "port": int(os.getenv("DB_PORT", 3306)),    # Default to 3306 if not set
+    "user": os.getenv("DB_USER", "root"),  # Default to 'movie_tv_db_user' if not set
+    "password": os.getenv("DB_PASSWORD", "password"),  # Default to 'movie_tv_db_user_password' if not set
+    "database": os.getenv("DB_NAME", "streaming_media_db")  # Default to 'streaming_media_db' if not set
 }
 
 # ===============================
