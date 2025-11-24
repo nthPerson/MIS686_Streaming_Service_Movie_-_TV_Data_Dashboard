@@ -44,6 +44,32 @@ DB_CONFIG = {
 }
 
 # ===============================
+# 1b. LENGTH CONSTRAINTS (from DDL)
+# ===============================
+
+MAX_LENGTHS = {
+    "rating_code": 10,
+    "service_name": 100,
+    "country_of_operation": 100,
+    "url": 255,
+    "global_title_name": 255,
+    "original_title": 255,
+    "genre_name": 100,
+    "country_name": 100,
+    "person_full_name": 200,
+    "primary_role": 50,
+    "role_name": 50,
+    "platform_show_id": 50,
+    "duration_raw": 50
+}
+
+def safe_truncate(s, max_len):
+    if s is None:
+        return None
+    s = str(s)
+    return s if len(s) <= max_len else s[:max_len]
+
+# ===============================
 # 2. FILE CONFIG
 # ===============================
 
@@ -134,7 +160,7 @@ def parse_duration_for_title(content_type, duration_raw):
 # ---------- DB lookups / inserts with caching ----------
 
 def get_or_create_streaming_service(cursor, service_name):
-    service_name_norm = normalize_string(service_name)
+    service_name_norm = safe_truncate(normalize_string(service_name), MAX_LENGTHS["service_name"])
     if service_name_norm in service_cache:
         return service_cache[service_name_norm]
 
@@ -160,7 +186,7 @@ def get_or_create_streaming_service(cursor, service_name):
 
 
 def get_or_create_rating(cursor, rating_code):
-    code = normalize_string(rating_code)
+    code = safe_truncate(normalize_string(rating_code), MAX_LENGTHS["rating_code"])
     if not code:
         code = "UNRATED"
 
@@ -184,7 +210,7 @@ def get_or_create_rating(cursor, rating_code):
 def get_or_create_genre(cursor, genre_name):
     if genre_name is None:
         return None
-    name = normalize_string(genre_name)
+    name = safe_truncate(normalize_string(genre_name), MAX_LENGTHS["genre_name"])
     if not name:
         return None
 
@@ -213,7 +239,7 @@ def get_or_create_genre(cursor, genre_name):
 def get_or_create_country(cursor, country_name):
     if country_name is None:
         return None
-    name = normalize_string(country_name)
+    name = safe_truncate(normalize_string(country_name), MAX_LENGTHS["country_name"])
     if not name:
         return None
 
@@ -240,7 +266,7 @@ def get_or_create_country(cursor, country_name):
 
 
 def get_or_create_role_type(cursor, role_name):
-    name = normalize_string(role_name)
+    name = safe_truncate(normalize_string(role_name), MAX_LENGTHS["role_name"])
     if not name:
         return None
 
@@ -269,7 +295,7 @@ def get_or_create_role_type(cursor, role_name):
 def get_or_create_person(cursor, full_name, primary_role=None):
     if full_name is None:
         return None
-    name = normalize_string(full_name)
+    name = safe_truncate(normalize_string(full_name), MAX_LENGTHS["person_full_name"])
     if not name:
         return None
 
@@ -297,6 +323,8 @@ def get_or_create_person(cursor, full_name, primary_role=None):
 
 def get_or_create_title(cursor, global_title_name, original_title, release_year,
                         age_rating_code, content_type, runtime_minutes, num_seasons):
+    global_title_name = safe_truncate(normalize_string(global_title_name), MAX_LENGTHS["global_title_name"])
+    original_title = safe_truncate(normalize_string(original_title), MAX_LENGTHS["original_title"])
     key = (global_title_name, release_year)
     if key in title_cache:
         return title_cache[key]
@@ -377,27 +405,33 @@ def link_title_persons(cursor, title_id, director_str, cast_str):
     director_role_id = get_or_create_role_type(cursor, "Director")
     actor_role_id = get_or_create_role_type(cursor, "Actor")
 
-    # Directors
+    # Directors (sanity: only first director; keep first + last tokens; truncate)
     if director_str and not pd.isna(director_str):
-        directors = [d.strip() for d in str(director_str).split(",") if d.strip()]
-        for d in directors:
-            pid = get_or_create_person(cursor, d, primary_role="Director")
-            if pid and director_role_id:
-                cursor.execute(
-                    """
-                    INSERT IGNORE INTO title_person_role
-                        (title_id, person_id, role_type_id, billing_order)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (title_id, pid, director_role_id, None)
-                )
+        first_segment = str(director_str).split(",")[0].strip()
+        tokens = [t for t in first_segment.split() if t]
+        if len(tokens) >= 2:
+            cleaned_director = f"{tokens[0]} {tokens[1]}"
+        else:
+            cleaned_director = tokens[0] if tokens else first_segment
+        cleaned_director = safe_truncate(cleaned_director, MAX_LENGTHS["person_full_name"])
+        pid = get_or_create_person(cursor, cleaned_director, primary_role="Director")
+        if pid and director_role_id:
+            cursor.execute(
+                """
+                INSERT IGNORE INTO title_person_role
+                    (title_id, person_id, role_type_id, billing_order)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (title_id, pid, director_role_id, None)
+            )
 
     # Cast
     if cast_str and not pd.isna(cast_str):
         # billing_order = index in the cast list
         actors = [a.strip() for a in str(cast_str).split(",") if a.strip()]
         for order, a in enumerate(actors, start=1):
-            pid = get_or_create_person(cursor, a, primary_role="Actor")
+            actor_name = safe_truncate(a, MAX_LENGTHS["person_full_name"])  # ensure fits
+            pid = get_or_create_person(cursor, actor_name, primary_role="Actor")
             if pid and actor_role_id:
                 cursor.execute(
                     """
@@ -412,6 +446,8 @@ def link_title_persons(cursor, title_id, director_str, cast_str):
 def insert_streaming_availability(cursor, streaming_service_id, title_id,
                                   platform_show_id, date_added, duration_raw,
                                   is_exclusive=False, availability_status="ACTIVE"):
+    platform_show_id = safe_truncate(platform_show_id, MAX_LENGTHS["platform_show_id"])
+    duration_raw = safe_truncate(duration_raw, MAX_LENGTHS["duration_raw"])
     cursor.execute(
         """
         INSERT IGNORE INTO streaming_availability
