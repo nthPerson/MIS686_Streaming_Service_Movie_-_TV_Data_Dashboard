@@ -105,22 +105,22 @@ Expected outcome: a success message listing all required tables. Exit code 0 mea
 ### Step 8: Perform a Dry Run (No Inserts)
 This checks that the four CSV files are readable and the parsing logic works:
 ```
-python data_wrangling/etl_streaming_titles.py --dry-run
+python etl_streaming_titles.py --dry-run
 ```
 Options:
 ```
-python data_wrangling/etl_streaming_titles.py --dry-run --sample-size 10
+python etl_streaming_titles.py --dry-run --sample-size 10
 ```
 The script prints simulated insert summaries (counts and sample rows). No data is written to MySQL.
 
 ### Step 9: Live ETL Run (Actual Inserts)
 When dry run looks good:
 ```
-python data_wrangling/etl_streaming_titles.py --live-run
+python etl_streaming_titles.py --live-run
 ```
 If you omit flags it defaults to live run:
 ```
-python data_wrangling/etl_streaming_titles.py
+python etl_streaming_titles.py
 ```
 Progress messages will show each CSV being processed. The script uses caching to reduce duplicate inserts and respects uniqueness constraints.
 
