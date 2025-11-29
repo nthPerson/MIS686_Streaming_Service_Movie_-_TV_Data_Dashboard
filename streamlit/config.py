@@ -58,6 +58,17 @@ class AppSettings:
     visualization: VisualizationSettings = field(
         default_factory=VisualizationSettings
     )
+    summary: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        summary = (
+            f"Database host={self.database.host}:{self.database.port}, "
+            f"user={self.database.user}, schema={self.database.name}"
+        )
+        object.__setattr__(self, "summary", summary)
+
+    def settings_summary(self) -> str:
+        return self.summary
 
 
 @lru_cache(maxsize=1)
@@ -78,8 +89,4 @@ def get_settings() -> AppSettings:
 def settings_summary() -> str:
     """Human-readable description useful for Streamlit debug panels."""
 
-    db = get_settings().database
-    return (
-        f"Database host={db.host}:{db.port}, user={db.user}, "
-        f"schema={db.name}"
-    )
+    return get_settings().summary
