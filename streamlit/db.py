@@ -65,3 +65,15 @@ def run_scalar(sql: str, params: Sequence[Any] | None = None) -> Any:
         row = cursor.fetchone()
         cursor.close()
         return None if row is None else row[0]
+
+
+def execute(sql: str, params: Sequence[Any] | None = None) -> int:
+    """Execute a data-modifying statement and return the last inserted row id."""
+
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(sql, params or ())
+        last_row_id = cursor.lastrowid
+        connection.commit()
+        cursor.close()
+        return last_row_id

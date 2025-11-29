@@ -50,6 +50,17 @@ def run() -> None:
     st.title("Streaming Media Intelligence Dashboard")
     st.caption("Explore catalog availability, content mix, and platform expansion trends.")
 
+    if hasattr(st, "page_link"):
+        st.page_link("pages/01_Login_Signup.py", label="Go to login / sign-up page", icon="🔐")
+    else:
+        st.markdown("[Go to login / sign-up page](pages/01_Login_Signup.py)")
+
+    if "current_user" in st.session_state:
+        user = st.session_state["current_user"]
+        st.success(f"Logged in as {user.username} ({user.role}).")
+    else:
+        st.info("You are browsing as a guest.")
+
     overview.render(filters)
     distribution.render(filters)
     trends.render(filters)
