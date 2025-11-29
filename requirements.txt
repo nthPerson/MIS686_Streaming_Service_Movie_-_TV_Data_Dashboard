@@ -6,3 +6,6 @@ python-dotenv
 pytz
 six
 tzdata
+streamlit
+matplotlib
+plotly
