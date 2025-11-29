@@ -7,10 +7,6 @@ from datetime import date
 from typing import List, Sequence, Tuple
 
 import pandas as pd
-
-# from .db import run_query
-# from .filters import FilterOptions, FilterState
-
 from db import run_query
 from filters import FilterOptions, FilterState
 

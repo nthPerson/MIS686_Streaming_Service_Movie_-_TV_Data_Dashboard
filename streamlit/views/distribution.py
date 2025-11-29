@@ -5,9 +5,6 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import streamlit as st
 
-# from ..filters import FilterState
-# from .. import queries
-
 from filters import FilterState
 import queries
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
 import streamlit as st
 
 # from .config import get_settings
@@ -39,8 +41,10 @@ def run() -> None:
 
     try:
         filters = _render_sidebar(settings.settings_summary())
-    except Exception:
-        st.stop()
+    except Exception as exc:
+        logger.exception("Failed to initialize sidebar filters")  # prints full stack trace
+        st.error("Failed to initialize sidebar filters.")
+        st.exception(exc)
         return
 
     st.title("Streaming Media Intelligence Dashboard")

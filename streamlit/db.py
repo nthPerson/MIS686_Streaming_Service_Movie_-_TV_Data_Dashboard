@@ -9,8 +9,6 @@ import mysql.connector
 import pandas as pd
 from mysql.connector import pooling
 
-# from .config import AppSettings, get_settings
-
 from config import AppSettings, get_settings
 
 _CONNECTION_POOL: pooling.MySQLConnectionPool | None = None

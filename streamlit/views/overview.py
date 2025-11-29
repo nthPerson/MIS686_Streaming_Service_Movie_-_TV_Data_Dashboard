@@ -5,9 +5,6 @@ from __future__ import annotations
 import streamlit as st
 import plotly.express as px
 
-# from ..filters import FilterState
-# from .. import queries
-
 from filters import FilterState
 import queries
 
