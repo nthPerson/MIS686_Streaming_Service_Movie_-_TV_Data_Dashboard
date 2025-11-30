@@ -44,5 +44,5 @@ def render(filters: FilterState | None) -> None:
 
     st.dataframe(
         country_df.rename(columns={"country_name": "Country", "title_count": "Titles"}),
-        use_container_width=True,
+        width='stretch',
     )

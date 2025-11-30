@@ -37,7 +37,7 @@ def render(filters: FilterState | None) -> None:
         labels={"value": "Titles", "service_name": "Platform", "variable": "Content Type"},
         title="Movie vs TV availability by platform",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.dataframe(
         platform_df.rename(
@@ -48,5 +48,5 @@ def render(filters: FilterState | None) -> None:
                 "tv_show_count": "TV Shows",
             }
         ),
-        use_container_width=True,
+        width='stretch',
     )

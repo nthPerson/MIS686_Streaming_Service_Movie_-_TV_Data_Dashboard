@@ -30,5 +30,5 @@ def render(filters: FilterState | None) -> None:
                 "shared_genres": "Shared Genres",
             }
         ),
-        use_container_width=True,
+        width='stretch',
     )
