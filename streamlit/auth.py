@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Tuple
 
-from mysql.connector import errors
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 
-from db import get_connection, run_query
+from db import get_session
+from models import AppRole, AppUser
 
 
 @dataclass(frozen=True)
@@ -25,41 +27,34 @@ def _hash_password(password: str) -> str:
 
 
 def list_roles() -> list[str]:
-    roles_df = run_query("SELECT role_name FROM app_role ORDER BY role_name")
-    if roles_df.empty:
-        return ["viewer"]
-    return roles_df["role_name"].tolist()
+    with get_session() as session:
+        roles = session.scalars(select(AppRole.role_name).order_by(AppRole.role_name)).all()
+    return roles or ["viewer"]
 
 
 def register_user(username: str, email: str, password: str, role_name: str) -> Tuple[bool, str]:
     hashed = _hash_password(password)
     try:
-        with get_connection() as connection:
-            cursor = connection.cursor()
-            cursor.execute("SELECT role_id FROM app_role WHERE role_name = %s", (role_name,))
-            role_row = cursor.fetchone()
-            if not role_row:
-                cursor.close()
+        with get_session() as session:
+            role = session.scalar(select(AppRole).where(AppRole.role_name == role_name))
+            if role is None:
                 return False, "Selected role is no longer available."
 
-            role_id = role_row[0]
-            cursor.execute(
-                """
-                INSERT INTO app_user (username, email, password_hash, role_id)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (username, email, hashed, role_id),
+            new_user = AppUser(
+                username=username,
+                email=email,
+                password_hash=hashed,
+                role_id=role.role_id,
             )
-            connection.commit()
-            cursor.close()
+            session.add(new_user)
         return True, "Account created! You can log in now."
-    except errors.IntegrityError as exc:
+    except IntegrityError as exc:
         message = "Username or email already exists."
-        if exc.errno == 1062:
-            if "username" in str(exc).lower():
-                message = "That username is already taken."
-            elif "email" in str(exc).lower():
-                message = "That email is already registered."
+        detail = str(exc.orig).lower() if exc.orig else ""
+        if "username" in detail:
+            message = "That username is already taken."
+        elif "email" in detail:
+            message = "That email is already registered."
         return False, message
     except Exception as exc:  # pragma: no cover - logged by caller
         return False, f"Unable to create account: {exc}"
@@ -67,30 +62,27 @@ def register_user(username: str, email: str, password: str, role_name: str) -> T
 
 def authenticate_user(username: str, password: str) -> Tuple[bool, str, AuthenticatedUser | None]:
     hashed = _hash_password(password)
-    with get_connection() as connection:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT au.user_id, au.username, au.email, ar.role_name
-            FROM app_user au
-            JOIN app_role ar ON ar.role_id = au.role_id
-            WHERE au.username = %s AND au.password_hash = %s AND au.is_active = 1
-            """,
-            (username, hashed),
+    with get_session() as session:
+        stmt = (
+            select(AppUser, AppRole.role_name)
+            .join(AppRole, AppRole.role_id == AppUser.role_id)
+            .where(AppUser.username == username, AppUser.password_hash == hashed, AppUser.is_active.is_(True))
         )
-        row: Dict | None = cursor.fetchone()
-        if not row:
-            cursor.close()
+        result = session.execute(stmt).first()
+        if not result:
             return False, "Invalid username or password.", None
 
-        cursor.execute("UPDATE app_user SET last_login_at = NOW() WHERE user_id = %s", (row["user_id"],))
-        connection.commit()
-        cursor.close()
+        user_row, role_name = result
+        session.execute(
+            update(AppUser)
+            .where(AppUser.user_id == user_row.user_id)
+            .values(last_login_at=func.now())
+        )
 
     user = AuthenticatedUser(
-        user_id=row["user_id"],
-        username=row["username"],
-        email=row["email"],
-        role=row["role_name"],
+        user_id=user_row.user_id,
+        username=user_row.username,
+        email=user_row.email,
+        role=role_name,
     )
     return True, f"Welcome back, {user.username}!", user

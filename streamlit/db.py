@@ -1,79 +1,71 @@
-"""Database helpers for Streamlit queries."""
+"""Database helpers powered by SQLAlchemy."""
 
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Iterator, Sequence
+from typing import Iterator
+from urllib.parse import quote_plus
 
-import mysql.connector
 import pandas as pd
-from mysql.connector import pooling
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from config import AppSettings, get_settings
 
-_CONNECTION_POOL: pooling.MySQLConnectionPool | None = None
+_ENGINE: Engine | None = None
+_SESSION_FACTORY: sessionmaker | None = None
 
 
-def _ensure_pool(settings: AppSettings | None = None) -> None:
-    """Initialize a reusable connection pool if it does not already exist."""
+def _build_connection_string(settings: AppSettings) -> str:
+    db = settings.database
+    user = quote_plus(db.user)
+    password = quote_plus(db.password)
+    host = db.host
+    port = db.port
+    name = db.name
+    return f"mysql+pymysql://{user}:{password}@{host}:{port}/{name}?charset=utf8mb4"
 
-    global _CONNECTION_POOL
-    if _CONNECTION_POOL is not None:
-        return
 
-    app_settings = settings or get_settings()
-    db = app_settings.database
-    _CONNECTION_POOL = pooling.MySQLConnectionPool(
-        pool_name="streamlit_pool",
-        pool_size=5,
-        host=db.host,
-        port=db.port,
-        user=db.user,
-        password=db.password,
-        database=db.name,
-        charset="utf8mb4",
-        autocommit=True,
-    )
+def get_engine() -> Engine:
+    global _ENGINE
+    if _ENGINE is None:
+        settings = get_settings()
+        _ENGINE = create_engine(
+            _build_connection_string(settings),
+            pool_pre_ping=True,
+            pool_recycle=1800,
+            future=True,
+        )
+    return _ENGINE
+
+
+def _get_session_factory() -> sessionmaker:
+    global _SESSION_FACTORY
+    if _SESSION_FACTORY is None:
+        _SESSION_FACTORY = sessionmaker(bind=get_engine(), expire_on_commit=False, future=True)
+    return _SESSION_FACTORY
 
 
 @contextmanager
-def get_connection(settings: AppSettings | None = None) -> Iterator[mysql.connector.MySQLConnection]:
-    """Context manager that yields a pooled MySQL connection."""
+def get_session() -> Iterator[Session]:
+    """Provide a transactional scope around a series of operations."""
 
-    _ensure_pool(settings)
-    assert _CONNECTION_POOL is not None  # for mypy/static checkers
-    connection = _CONNECTION_POOL.get_connection()
+    session = _get_session_factory()()
     try:
-        yield connection
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
-        connection.close()
+        session.close()
 
 
-def run_query(sql: str, params: Sequence[Any] | None = None) -> pd.DataFrame:
-    """Execute a SQL query and return a DataFrame."""
+def run_dataframe(query_text: str, params: dict | None = None) -> pd.DataFrame:
+    """Fallback helper for simple text queries."""
 
-    with get_connection() as connection:
-        return pd.read_sql(sql, connection, params=params)
-
-
-def run_scalar(sql: str, params: Sequence[Any] | None = None) -> Any:
-    """Execute a scalar query (first column of the first row)."""
-
-    with get_connection() as connection:
-        cursor = connection.cursor()
-        cursor.execute(sql, params or ())
-        row = cursor.fetchone()
-        cursor.close()
-        return None if row is None else row[0]
-
-
-def execute(sql: str, params: Sequence[Any] | None = None) -> int:
-    """Execute a data-modifying statement and return the last inserted row id."""
-
-    with get_connection() as connection:
-        cursor = connection.cursor()
-        cursor.execute(sql, params or ())
-        last_row_id = cursor.lastrowid
-        connection.commit()
-        cursor.close()
-        return last_row_id
+    with get_engine().connect() as connection:
+        result = connection.execute(text(query_text), params or {})
+        rows = result.mappings().all()
+    return pd.DataFrame(rows)
