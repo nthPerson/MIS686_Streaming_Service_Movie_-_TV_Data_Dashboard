@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List
 
 import pandas as pd
-from sqlalchemy import and_, case, distinct, func, select
+from sqlalchemy import and_, case, distinct, func, select, text
 from sqlalchemy.orm import aliased
 
 from db import get_session
@@ -157,6 +157,15 @@ def fetch_overview_metrics(filters: FilterState | None) -> pd.DataFrame:
         stmt = stmt.where(and_(*conditions))
 
     return _execute_statement(stmt)
+
+
+def fetch_service_content_summary_view() -> pd.DataFrame:
+    statement = text(
+        "SELECT service_name, content_type, title_count FROM vw_service_content_summary"
+    )
+    with get_session() as session:
+        rows = session.execute(statement).mappings().all()
+    return _to_dataframe(rows)
 
 
 def fetch_platform_breakdown(filters: FilterState | None) -> pd.DataFrame:

@@ -100,3 +100,15 @@ class AppUser(Base):
     last_login_at = Column(DateTime)
 
     role = relationship("AppRole", back_populates="users")
+
+
+class AppUserAudit(Base):
+    __tablename__ = "app_user_audit"
+
+    audit_id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, nullable=False)
+    action = Column(String(10), nullable=False)
+    old_role_id = Column(Integer)
+    new_role_id = Column(Integer)
+    changed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    changed_by = Column(String(100), nullable=False)

@@ -27,11 +27,15 @@ with login_tab:
             if success:
                 st.success(message)
                 st.session_state["current_user"] = user
+                if hasattr(st, "switch_page"):
+                    st.switch_page("app.py")
+                else:
+                    st.experimental_rerun()
             else:
                 st.error(message)
 
 with signup_tab:
-    st.write("Choose any role for now—this project does not enforce per-role permissions yet.")
+    st.write("Choose a role to unlock the corresponding role-specific pages.")
     available_roles = list_roles()
     with st.form("signup_form", clear_on_submit=True):
         signup_username = st.text_input("Username", key="signup_username")
@@ -59,7 +63,10 @@ st.divider()
 if "current_user" in st.session_state:
     user = st.session_state["current_user"]
     st.info(f"Logged in as {user.username} ({user.role}).")
+    if st.button("Log out", type="secondary"):
+        st.session_state.pop("current_user", None)
+        st.experimental_rerun()
+    if hasattr(st, "page_link"):
+        st.page_link("app.py", label="⬅️ Go to dashboard", icon="🏠")
 else:
     st.info("You are not logged in yet.")
-
-st.page_link("app.py", label="⬅️ Back to dashboard", icon="🏠")
