@@ -172,6 +172,64 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 - **Foreign Keys**: `fk_sa_streaming_service` (restrict delete) and `fk_sa_title` (cascade delete with title).
 - **Indexes**: `idx_sa_title_id`, `idx_sa_service_id` support filtering by either axis.
 
+### app_role (`S1`)
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `role_id` | INT UNSIGNED AUTO_INCREMENT | NO | Surrogate key. |
+| `role_name` | VARCHAR(50) | NO | Unique application role (admin, analyst, viewer). |
+
+- **Primary Key**: `pk_app_role (role_id)`.
+- **Unique Constraint**: `uq_app_role_name (role_name)` ensures role labels remain distinct.
+- **Purpose**: Lookup dimension for application-level authorization.
+
+### app_user (`S2`)
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `user_id` | BIGINT UNSIGNED AUTO_INCREMENT | NO | Surrogate key. |
+| `username` | VARCHAR(100) | NO | Unique login handle. |
+| `email` | VARCHAR(255) | NO | Unique email address. |
+| `password_hash` | VARCHAR(255) | NO | Bcrypt/Argon2 hash. |
+| `role_id` | INT UNSIGNED | NO | FK → `app_role.role_id`. |
+| `is_active` | TINYINT(1) | NO | Boolean, default 1. |
+| `created_at` | DATETIME | NO | Defaults to `CURRENT_TIMESTAMP`. |
+| `last_login_at` | DATETIME | YES | Nullable last-login audit. |
+
+- **Primary Key**: `pk_app_user (user_id)`.
+- **Unique Constraints**: `uq_app_user_username`, `uq_app_user_email` enforce uniqueness per user.
+- **Foreign Key**: `fk_app_user_role` cascades role updates, restricts deletes.
+- **Purpose**: Stores Streamlit app logins tied to logical roles.
+
+### app_user_audit (`S3`)
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `audit_id` | BIGINT UNSIGNED AUTO_INCREMENT | NO | Surrogate key. |
+| `user_id` | BIGINT UNSIGNED | NO | FK → `app_user.user_id`. |
+| `action` | ENUM('CREATE','UPDATE','DELETE') | NO | Type of change recorded. |
+| `old_role_id` | INT UNSIGNED | YES | Previous role (if applicable). |
+| `new_role_id` | INT UNSIGNED | YES | New role. |
+| `changed_at` | DATETIME | NO | Defaults to `CURRENT_TIMESTAMP`. |
+| `changed_by` | VARCHAR(100) | NO | MySQL `CURRENT_USER()` executing the change. |
+
+- **Primary Key**: `pk_app_user_audit (audit_id)`.
+- **Purpose**: Captures a row whenever the `app_user` table receives inserts/updates/deletes.
+- **Trigger Dependency**: Populated by `trg_app_user_after_insert` (see below).
+
+## Derived Objects
+
+### vw_service_content_summary
+- **Type**: Database view combining `streaming_availability`, `streaming_service`, and `title`.
+- **Purpose**: Aggregates total titles per platform by `content_type` (MOVIE vs TV_SHOW) for fast comparisons.
+- **Key Columns**: `service_name`, `content_type`, `title_count` (COUNT DISTINCT `title_id`).
+
+### sp_get_titles_for_dashboard
+- **Type**: Stored procedure parameterized by `service_name`, `content_type`, and release-year range.
+- **Purpose**: Returns a filtered list of titles with associated platform metadata to support dashboard filtering from the database side.
+- **Filter Behavior**: Each argument is optional (`NULL` bypasses that predicate) enabling combinations of platform/type/year filters.
+
+### trg_app_user_after_insert
+- **Type**: AFTER INSERT trigger on `app_user`.
+- **Purpose**: Automatically writes to `app_user_audit` whenever a new application-level user is created, tracking the role assignment and MySQL user that performed the action.
+
 ## Relationship Highlights
 - **Inheritance**: `title` is the parent for `movie` and `tv_show`. Each title row should appear in exactly one subtype table determined by `content_type`.
 - **Dimensional Bridges**: `title_genre`, `title_country`, and `title_person_role` implement many-to-many relationships between titles and their associated genres, countries, and people/roles, respectively.

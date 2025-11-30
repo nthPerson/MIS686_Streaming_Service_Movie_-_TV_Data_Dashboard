@@ -30,11 +30,19 @@ def render(filters: FilterState | None) -> None:
         st.warning("No platform data available for the current filters.")
         return
 
+    melted = platform_df.melt(
+        id_vars="service_name",
+        value_vars=["movie_count", "tv_show_count"],
+        var_name="Content Type",
+        value_name="Titles",
+    )
     fig = px.bar(
-        platform_df,
+        melted,
         x="service_name",
-        y=["movie_count", "tv_show_count"],
-        labels={"value": "Titles", "service_name": "Platform", "variable": "Content Type"},
+        y="Titles",
+        color="Content Type",
+        barmode="stack",
+        labels={"service_name": "Platform", "Titles": "Titles"},
         title="Movie vs TV availability by platform",
     )
     st.plotly_chart(fig, use_container_width=True)

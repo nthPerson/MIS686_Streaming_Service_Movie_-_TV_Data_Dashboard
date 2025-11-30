@@ -18,8 +18,8 @@ Tables expected (already created via your DDL):
 - streaming_availability
 """
 
-import mysql.connector
-from mysql.connector import Error
+import pymysql
+from pymysql import err as pymysql_err
 import pandas as pd
 import re
 import argparse
@@ -111,7 +111,7 @@ title_cache = {}  # key: (global_title_name, release_year) -> title_id
 # ===============================
 
 def get_connection():
-    return mysql.connector.connect(**DB_CONFIG)
+    return pymysql.connect(charset="utf8mb4", cursorclass=pymysql.cursors.Cursor, **DB_CONFIG)
 
 
 def normalize_string(s):
@@ -614,7 +614,7 @@ def test_connection(verbose: bool = True) -> bool:
             if extra:
                 print(" Extra tables detected:", ", ".join(sorted(extra)))
         return not missing
-    except Error as e:
+    except pymysql_err.MySQLError as e:
         if verbose:
             print(f"Connection test failed: {e}")
         return False
@@ -814,7 +814,7 @@ def live_run():
             process_csv_file(cursor, cfg["path"], cfg["service_name"])
             conn.commit()
         print("\nAll files processed successfully.")
-    except Error as e:
+    except pymysql_err.MySQLError as e:
         print(f"Error connecting to MySQL or executing queries: {e}")
     finally:
         try:

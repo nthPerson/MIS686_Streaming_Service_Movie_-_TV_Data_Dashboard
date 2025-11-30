@@ -24,7 +24,7 @@ def render(filters: FilterState | None) -> None:
             labels={"release_year": "Release Year", "title_count": "Titles", "service_name": "Platform"},
             title="Catalog growth by original release year",
         )
-        st.plotly_chart(fig_release, use_container_width=True)
+        st.plotly_chart(fig_release, width='stretch')
 
     st.divider()
 
@@ -43,4 +43,4 @@ def render(filters: FilterState | None) -> None:
         labels={"month_bucket": "Month", "title_count": "Titles", "service_name": "Platform"},
         title="Monthly additions by platform",
     )
-    st.plotly_chart(fig_added, use_container_width=True)
+    st.plotly_chart(fig_added, width='stretch')

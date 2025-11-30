@@ -15,4 +15,4 @@ def render(filters: FilterState | None) -> None:
         st.info("No titles match the current filters.")
         return
 
-    st.dataframe(table_df, use_container_width=True)
+    st.dataframe(table_df, width='stretch')
