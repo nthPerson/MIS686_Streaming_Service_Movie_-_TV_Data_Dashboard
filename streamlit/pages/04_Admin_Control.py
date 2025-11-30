@@ -57,7 +57,8 @@ with col_add:
             success, message = register_user(new_username.strip(), new_email.strip(), new_password, new_role)
             if success:
                 st.success(message)
-                st.experimental_rerun()
+                # st.rerun()
+                st.rerun()
             else:
                 st.error(message)
 
@@ -76,7 +77,7 @@ with col_role:
         success, message = update_user_role(user_choices[selected_user_label], new_role_name)
         if success:
             st.success(message)
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error(message)
 
@@ -95,7 +96,7 @@ with col_status:
         success, message = toggle_user_active(user_id, new_status)
         if success:
             st.success(message)
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error(message)
 
@@ -113,7 +114,7 @@ with col_delete:
         success, message = delete_user(delete_choices[delete_label])
         if success:
             st.success(message)
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error(message)
 

@@ -62,7 +62,7 @@ def run() -> None:
             if hasattr(st, "switch_page"):
                 st.switch_page("pages/01_Login_Signup.py")
             else:
-                st.experimental_rerun()
+                st.rerun()
 
     with links_col:
         if hasattr(st, "page_link"):

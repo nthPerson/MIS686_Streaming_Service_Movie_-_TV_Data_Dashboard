@@ -30,7 +30,7 @@ with login_tab:
                 if hasattr(st, "switch_page"):
                     st.switch_page("app.py")
                 else:
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.error(message)
 
@@ -65,7 +65,7 @@ if "current_user" in st.session_state:
     st.info(f"Logged in as {user.username} ({user.role}).")
     if st.button("Log out", type="secondary"):
         st.session_state.pop("current_user", None)
-        st.experimental_rerun()
+        st.rerun()
     if hasattr(st, "page_link"):
         st.page_link("app.py", label="⬅️ Go to dashboard", icon="🏠")
 else:
