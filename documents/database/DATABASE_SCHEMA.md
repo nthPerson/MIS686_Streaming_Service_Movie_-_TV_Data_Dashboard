@@ -1,6 +1,6 @@
 # Streaming Media Database Schema
 
-This document summarizes the physical schema created by `documents/tv_movie_DDL.sql` for the `streaming_media_db` MySQL database. The design centers on the `title` supertype and its movie/TV subtypes plus associative tables that capture genres, countries, people/roles, and platform availability.
+This document summarizes the physical schema created by `documents/tv_movie_DDL.sql` and extended by `documents/database/users_views_triggers.sql` for the `streaming_media_db` MySQL database. The design centers on the `title` supertype and its movie/TV subtypes plus associative tables that capture genres, countries, people/roles, platform availability, and the Streamlit application-level security objects.
 
 ## Entity Overview
 - `rating`: Normalizes parental guidance ratings and minimum suggested ages.
@@ -13,15 +13,6 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 - `streaming_availability`: Records which service carries which title, along with platform-specific identifiers, dates, exclusivity, and status flags.
 
 ## Table Details
-
-### rating (`E7`)
-| Column | Type | Null | Notes |
-| --- | --- | --- | --- |
-| `rating_code` | VARCHAR(10) | NO | Primary key; codes like `TV-MA`, `PG-13`. |
-| `age_minimum` | TINYINT UNSIGNED | YES | Suggested minimum viewer age. |
-
-- **Primary Key**: `pk_rating (rating_code)`.
-- **Referenced By**: `title.age_rating_code` (cascade on update, restrict on delete).
 
 ### streaming_service (`E1`)
 | Column | Type | Null | Notes |
@@ -96,6 +87,15 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 - **Foreign Keys**: `fk_title_genre_title`, `fk_title_genre_genre`.
 - **Indexes**: `idx_title_genre_genre_id (genre_id)` for filtering by genre.
 - **Purpose**: Many-to-many association between titles and genres (cascade delete when parent title is removed; restrict when genre still in use).
+
+### rating (`E7`)
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `rating_code` | VARCHAR(10) | NO | Primary key; codes like `TV-MA`, `PG-13`. |
+| `age_minimum` | TINYINT UNSIGNED | YES | Suggested minimum viewer age. |
+
+- **Primary Key**: `pk_rating (rating_code)`.
+- **Referenced By**: `title.age_rating_code` (cascade on update, restrict on delete).
 
 ### country (`E8`)
 | Column | Type | Null | Notes |
@@ -180,7 +180,7 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 
 - **Primary Key**: `pk_app_role (role_id)`.
 - **Unique Constraint**: `uq_app_role_name (role_name)` ensures role labels remain distinct.
-- **Purpose**: Lookup dimension for application-level authorization.
+- **Purpose**: Lookup dimension for application-level authorization; the supplemental SQL seeds the canonical `admin`, `analyst`, and `viewer` roles consumed by `streamlit/auth.py`.
 
 ### app_user (`S2`)
 | Column | Type | Null | Notes |
@@ -197,7 +197,7 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 - **Primary Key**: `pk_app_user (user_id)`.
 - **Unique Constraints**: `uq_app_user_username`, `uq_app_user_email` enforce uniqueness per user.
 - **Foreign Key**: `fk_app_user_role` cascades role updates, restricts deletes.
-- **Purpose**: Stores Streamlit app logins tied to logical roles.
+- **Purpose**: Stores Streamlit app logins tied to logical roles; `streamlit/auth.py` handles registration, login, role management, and the Admin Control Center (`streamlit/pages/04_Admin_Control.py`) surfaces these rows for CRUD operations.
 
 ### app_user_audit (`S3`)
 | Column | Type | Null | Notes |
@@ -211,8 +211,8 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 | `changed_by` | VARCHAR(100) | NO | MySQL `CURRENT_USER()` executing the change. |
 
 - **Primary Key**: `pk_app_user_audit (audit_id)`.
-- **Purpose**: Captures a row whenever the `app_user` table receives inserts/updates/deletes.
-- **Trigger Dependency**: Populated by `trg_app_user_after_insert` (see below).
+- **Purpose**: Captures a row whenever the `app_user` table receives inserts/updates/deletes so the Admin Control Center can show audit history via `streamlit/auth.fetch_user_audit()`.
+- **Trigger Dependency**: Populated by `trg_app_user_after_insert` (see below); future UPDATE/DELETE triggers can reuse the same audit table.
 
 ## Derived Objects
 
@@ -220,15 +220,17 @@ This document summarizes the physical schema created by `documents/tv_movie_DDL.
 - **Type**: Database view combining `streaming_availability`, `streaming_service`, and `title`.
 - **Purpose**: Aggregates total titles per platform by `content_type` (MOVIE vs TV_SHOW) for fast comparisons.
 - **Key Columns**: `service_name`, `content_type`, `title_count` (COUNT DISTINCT `title_id`).
+- **Usage**: Queried via `streamlit/queries.fetch_service_content_summary_view()` and rendered on the Viewer Platform dashboard (`streamlit/pages/02_Viewer_Platform.py`).
 
 ### sp_get_titles_for_dashboard
 - **Type**: Stored procedure parameterized by `service_name`, `content_type`, and release-year range.
 - **Purpose**: Returns a filtered list of titles with associated platform metadata to support dashboard filtering from the database side.
-- **Filter Behavior**: Each argument is optional (`NULL` bypasses that predicate) enabling combinations of platform/type/year filters.
+- **Filter Behavior**: Each argument is optional (`NULL` bypasses that predicate) enabling combinations of platform/type/year filters; available for future direct invocation from the Streamlit layer when server-side filtering is preferable to SQLAlchemy query composition.
 
 ### trg_app_user_after_insert
 - **Type**: AFTER INSERT trigger on `app_user`.
 - **Purpose**: Automatically writes to `app_user_audit` whenever a new application-level user is created, tracking the role assignment and MySQL user that performed the action.
+- **Usage**: Ensures the Admin Control Center’s audit table (backed by `streamlit/auth.fetch_user_audit()`) always reflects who created each application user without relying on application code.
 
 ## Relationship Highlights
 - **Inheritance**: `title` is the parent for `movie` and `tv_show`. Each title row should appear in exactly one subtype table determined by `content_type`.
