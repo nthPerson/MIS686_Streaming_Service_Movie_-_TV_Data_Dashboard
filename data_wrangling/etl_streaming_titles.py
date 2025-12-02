@@ -63,6 +63,8 @@ MAX_LENGTHS = {
     "duration_raw": 50
 }
 
+BATCH_SIZE = int(os.getenv("ETL_BATCH_SIZE", "500"))
+
 def safe_truncate(s, max_len):
     if s is None:
         return None
@@ -104,6 +106,108 @@ country_cache = {}
 role_type_cache = {}
 person_cache = {}
 title_cache = {}  # key: (global_title_name, release_year) -> title_id
+
+
+def preload_reference_data(cursor):
+    """Warm small lookup tables to cut repeated SELECT latency."""
+    summary = []
+
+    try:
+        cursor.execute("SELECT rating_code FROM rating")
+        rows = cursor.fetchall()
+        for (code,) in rows:
+            if code:
+                rating_cache[code] = True
+        summary.append(f"rating={len(rows)}")
+    except pymysql_err.MySQLError:
+        pass
+
+    try:
+        cursor.execute("SELECT service_name, streaming_service_id FROM streaming_service")
+        rows = cursor.fetchall()
+        for name, sid in rows:
+            norm = safe_truncate(normalize_string(name), MAX_LENGTHS["service_name"])
+            if norm:
+                service_cache[norm] = sid
+        summary.append(f"service={len(rows)}")
+    except pymysql_err.MySQLError:
+        pass
+
+    try:
+        cursor.execute("SELECT genre_name, genre_id FROM genre")
+        rows = cursor.fetchall()
+        for name, gid in rows:
+            norm = safe_truncate(normalize_string(name), MAX_LENGTHS["genre_name"])
+            if norm:
+                genre_cache[norm] = gid
+        summary.append(f"genre={len(rows)}")
+    except pymysql_err.MySQLError:
+        pass
+
+    try:
+        cursor.execute("SELECT country_name, country_id FROM country")
+        rows = cursor.fetchall()
+        for name, cid in rows:
+            norm = safe_truncate(normalize_string(name), MAX_LENGTHS["country_name"])
+            if norm:
+                country_cache[norm] = cid
+        summary.append(f"country={len(rows)}")
+    except pymysql_err.MySQLError:
+        pass
+
+    try:
+        cursor.execute("SELECT role_name, role_type_id FROM role_type")
+        rows = cursor.fetchall()
+        for name, rid in rows:
+            norm = safe_truncate(normalize_string(name), MAX_LENGTHS["role_name"])
+            if norm:
+                role_type_cache[norm] = rid
+        summary.append(f"role_type={len(rows)}")
+    except pymysql_err.MySQLError:
+        pass
+
+    if summary:
+        print("Cache warmup:", ", ".join(summary))
+
+
+def update_title_description_if_empty(cursor, title_id, description):
+    if not description:
+        return
+    cursor.execute(
+        "UPDATE title SET description = %s WHERE title_id = %s AND description IS NULL",
+        (description, title_id)
+    )
+
+
+def build_streaming_availability_row(streaming_service_id, title_id, platform_show_id,
+                                     date_added, duration_raw, is_exclusive=False,
+                                     availability_status="ACTIVE"):
+    platform_show_id = safe_truncate(platform_show_id, MAX_LENGTHS["platform_show_id"])
+    duration_raw = safe_truncate(duration_raw, MAX_LENGTHS["duration_raw"])
+    return (
+        streaming_service_id,
+        title_id,
+        platform_show_id,
+        date_added,
+        duration_raw,
+        int(is_exclusive),
+        availability_status
+    )
+
+
+def flush_streaming_availability_batch(cursor, batch):
+    if not batch:
+        return
+    cursor.executemany(
+        """
+        INSERT IGNORE INTO streaming_availability
+            (streaming_service_id, title_id, platform_show_id,
+             date_added, duration_raw, is_exclusive, availability_status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        batch
+    )
+    batch.clear()
 
 
 # ===============================
@@ -376,13 +480,16 @@ def link_title_genres(cursor, title_id, genres_str):
     if pd.isna(genres_str) or not str(genres_str).strip():
         return
     genres = [g.strip() for g in str(genres_str).split(",") if g.strip()]
+    rows = []
     for g in genres:
         gid = get_or_create_genre(cursor, g)
         if gid is None:
             continue
-        cursor.execute(
+        rows.append((title_id, gid))
+    if rows:
+        cursor.executemany(
             "INSERT IGNORE INTO title_genre (title_id, genre_id) VALUES (%s, %s)",
-            (title_id, gid)
+            rows
         )
 
 
@@ -390,13 +497,16 @@ def link_title_countries(cursor, title_id, countries_str):
     if pd.isna(countries_str) or not str(countries_str).strip():
         return
     countries = [c.strip() for c in str(countries_str).split(",") if c.strip()]
+    rows = []
     for c in countries:
         cid = get_or_create_country(cursor, c)
         if cid is None:
             continue
-        cursor.execute(
+        rows.append((title_id, cid))
+    if rows:
+        cursor.executemany(
             "INSERT IGNORE INTO title_country (title_id, country_id) VALUES (%s, %s)",
-            (title_id, cid)
+            rows
         )
 
 
@@ -404,6 +514,7 @@ def link_title_persons(cursor, title_id, director_str, cast_str):
     # Make sure basic role types exist
     director_role_id = get_or_create_role_type(cursor, "Director")
     actor_role_id = get_or_create_role_type(cursor, "Actor")
+    insert_rows = []
 
     # Directors (sanity: only first director; keep first + last tokens; truncate)
     if director_str and not pd.isna(director_str):
@@ -416,14 +527,7 @@ def link_title_persons(cursor, title_id, director_str, cast_str):
         cleaned_director = safe_truncate(cleaned_director, MAX_LENGTHS["person_full_name"])
         pid = get_or_create_person(cursor, cleaned_director, primary_role="Director")
         if pid and director_role_id:
-            cursor.execute(
-                """
-                INSERT IGNORE INTO title_person_role
-                    (title_id, person_id, role_type_id, billing_order)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (title_id, pid, director_role_id, None)
-            )
+            insert_rows.append((title_id, pid, director_role_id, None))
 
     # Cast
     if cast_str and not pd.isna(cast_str):
@@ -433,38 +537,18 @@ def link_title_persons(cursor, title_id, director_str, cast_str):
             actor_name = safe_truncate(a, MAX_LENGTHS["person_full_name"])  # ensure fits
             pid = get_or_create_person(cursor, actor_name, primary_role="Actor")
             if pid and actor_role_id:
-                cursor.execute(
-                    """
-                    INSERT IGNORE INTO title_person_role
-                        (title_id, person_id, role_type_id, billing_order)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (title_id, pid, actor_role_id, order)
-                )
+                insert_rows.append((title_id, pid, actor_role_id, order))
 
-
-def insert_streaming_availability(cursor, streaming_service_id, title_id,
-                                  platform_show_id, date_added, duration_raw,
-                                  is_exclusive=False, availability_status="ACTIVE"):
-    platform_show_id = safe_truncate(platform_show_id, MAX_LENGTHS["platform_show_id"])
-    duration_raw = safe_truncate(duration_raw, MAX_LENGTHS["duration_raw"])
-    cursor.execute(
-        """
-        INSERT IGNORE INTO streaming_availability
-            (streaming_service_id, title_id, platform_show_id,
-             date_added, duration_raw, is_exclusive, availability_status)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            streaming_service_id,
-            title_id,
-            platform_show_id,
-            date_added,
-            duration_raw,
-            int(is_exclusive),
-            availability_status
+    if insert_rows:
+        cursor.executemany(
+            """
+            INSERT IGNORE INTO title_person_role
+                (title_id, person_id, role_type_id, billing_order)
+            VALUES (%s, %s, %s, %s)
+            """,
+            insert_rows
         )
-    )
+
 
 
 # ===============================
@@ -489,6 +573,7 @@ def process_csv_file(cursor, file_path, service_name):
     service_id = get_or_create_streaming_service(cursor, service_name)
 
     row_count = 0
+    availability_batch = []
 
     for _, row in df.iterrows():
         row_count += 1
@@ -538,11 +623,7 @@ def process_csv_file(cursor, file_path, service_name):
         )
 
         # Update description if still NULL in DB and we have one
-        if description:
-            cursor.execute(
-                "UPDATE title SET description = COALESCE(description, %s) WHERE title_id = %s",
-                (description, title_id)
-            )
+        update_title_description_if_empty(cursor, title_id, description)
 
         # Insert subtype rows
         if content_type == "MOVIE":
@@ -564,20 +645,25 @@ def process_csv_file(cursor, file_path, service_name):
             # Use a fallback if show_id missing (rare)
             platform_show_id = f"{service_name[:3].upper()}_{title_id}"
 
-        insert_streaming_availability(
-            cursor,
-            streaming_service_id=service_id,
-            title_id=title_id,
-            platform_show_id=platform_show_id,
-            date_added=date_added,
-            duration_raw=duration_raw,
-            is_exclusive=False,              # You could compute this later
-            availability_status="ACTIVE"
+        availability_batch.append(
+            build_streaming_availability_row(
+                streaming_service_id=service_id,
+                title_id=title_id,
+                platform_show_id=platform_show_id,
+                date_added=date_added,
+                duration_raw=duration_raw,
+                is_exclusive=False,
+                availability_status="ACTIVE"
+            )
         )
+
+        if len(availability_batch) >= BATCH_SIZE:
+            flush_streaming_availability_batch(cursor, availability_batch)
 
         if row_count % 500 == 0:
             print(f"  Processed {row_count} rows from {file_path}...")
 
+    flush_streaming_availability_batch(cursor, availability_batch)
     print(f"Finished {file_path}: processed {row_count} rows.")
 
 
@@ -805,16 +891,22 @@ def dry_run(sample_size: int = 5):
 ###############################
 
 def live_run():
+    conn = None
+    cursor = None
     try:
         if not test_connection(verbose=False):
             print("WARNING: Some required tables are missing. Proceeding anyway.")
         conn = get_connection()
+        conn.autocommit(False)
         cursor = conn.cursor()
+        preload_reference_data(cursor)
         for cfg in CSV_FILES:
             process_csv_file(cursor, cfg["path"], cfg["service_name"])
-            conn.commit()
+        conn.commit()
         print("\nAll files processed successfully.")
     except pymysql_err.MySQLError as e:
+        if conn:
+            conn.rollback()
         print(f"Error connecting to MySQL or executing queries: {e}")
     finally:
         try:
