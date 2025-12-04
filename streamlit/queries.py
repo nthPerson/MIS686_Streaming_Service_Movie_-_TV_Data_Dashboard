@@ -21,6 +21,130 @@ from models import (
     TitleGenre,
 )
 
+_RATING_G = ("G", "TV-G", "TV-Y", "Y")
+_RATING_PG = ("PG", "TV-PG", "TV-Y7", "TV-Y7-FV")
+_RATING_PG13 = ("PG-13", "TV-14")
+_RATING_R = ("R", "NC-17", "TV-MA")
+
+_GENRE_GROUPS = {
+    "Kids & Family": (
+        "Children & Family Movies",
+        "Family",
+        "Kids",
+        "Teen",
+        "Teen TV Shows",
+        "Young Adult Audience",
+        "Coming of Age",
+    ),
+    "Comedy": (
+        "Comedy",
+        "Comedies",
+        "TV Comedies",
+        "Sitcom",
+        "Stand Up",
+        "Stand-Up Comedy",
+        "Stand-Up Comedy & Talk Shows",
+        "Sketch Comedy",
+        "Parody",
+        "Variety",
+        "Late Night",
+        "Talk Show",
+        "Talk Show and Variety",
+        "Game Shows",
+        "Game Show / Competition",
+        "Buddy",
+    ),
+    "Drama": (
+        "Drama",
+        "Dramas",
+        "TV Dramas",
+        "Anthology",
+        "Soap Opera / Melodrama",
+        "Medical",
+    ),
+    "Action & Adventure": (
+        "Action",
+        "Action & Adventure",
+        "Action-Adventure",
+        "Adventure",
+        "Disaster",
+        "Spy/Espionage",
+        "Police/Cop",
+        "Survival",
+        "Superhero",
+        "Military and War",
+        "Western",
+        "TV Action & Adventure",
+    ),
+    "Horror & Thriller": (
+        "Horror",
+        "Horror Movies",
+        "Thriller",
+        "Thrillers",
+        "Suspense",
+        "TV Horror",
+        "TV Thrillers",
+    ),
+    "Romance": (
+        "Romance",
+        "Romantic Movies",
+        "Romantic TV Shows",
+        "Romantic Comedy",
+    ),
+    "Sci-Fi & Fantasy": (
+        "Sci-Fi & Fantasy",
+        "Science Fiction",
+        "TV Sci-Fi & Fantasy",
+        "Fantasy",
+    ),
+    "Crime & Mystery": (
+        "Crime",
+        "Crime TV Shows",
+        "Mystery",
+        "TV Mysteries",
+    ),
+    "Documentary & History": (
+        "Documentary",
+        "Documentaries",
+        "Docuseries",
+        "Biographical",
+        "Historical",
+        "History",
+        "Science & Nature TV",
+        "Science & Technology",
+        "Animals & Nature",
+        "Special Interest",
+        "News",
+    ),
+    "Music & Performing Arts": (
+        "Music",
+        "Music & Musicals",
+        "Music Videos and Concerts",
+        "Musical",
+        "Concert Film",
+        "Dance",
+        "Arts",
+    ),
+    "Animation & Anime": (
+        "Anime",
+        "Anime Features",
+        "Anime Series",
+        "Animation",
+        "Adult Animation",
+        "Cartoons",
+    ),
+    "International / Regional": (
+        "International",
+        "International Movies",
+        "International TV Shows",
+        "British TV Shows",
+        "Korean TV Shows",
+        "Spanish-Language TV Shows",
+        "Latino",
+        "Black Stories",
+    ),
+}
+
 
 def _to_dataframe(rows: list[dict]) -> pd.DataFrame:
     if not rows:
@@ -134,6 +258,33 @@ def _build_filters(
     return conditions
 
 
+def _rating_bucket_expression():
+    rating_upper = func.upper(Title.age_rating_code)
+    return case(
+        (rating_upper.in_(_RATING_G), "G"),
+        (rating_upper.in_(_RATING_PG), "PG"),
+        (rating_upper.in_(_RATING_PG13), "PG-13"),
+        (rating_upper.in_(_RATING_R), "R/TV-MA"),
+        else_="Unrated/Other",
+    )
+
+
+def _maturity_bucket_expression():
+    rating_upper = func.upper(Title.age_rating_code)
+    return case(
+        (rating_upper.in_(_RATING_G + _RATING_PG), "Family (G/PG)"),
+        (rating_upper.in_(_RATING_PG13 + _RATING_R), "Mature (PG-13+/R)"),
+        else_="Other / Unrated",
+    )
+
+
+def _genre_category_case():
+    conditions = []
+    for label, names in _GENRE_GROUPS.items():
+        conditions.append((Genre.genre_name.in_(names), label))
+    return case(*conditions, else_="Other")
+
+
 def fetch_overview_metrics(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
 
@@ -192,18 +343,18 @@ def fetch_platform_breakdown(filters: FilterState | None) -> pd.DataFrame:
 
 def fetch_genre_distribution(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
+    genre_category = _genre_category_case().label("genre_category")
 
     stmt = (
         select(
-            StreamingService.service_name,
-            Genre.genre_name,
+            genre_category,
             func.count(distinct(Title.title_id)).label("title_count"),
         )
         .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
         .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
         .join(TitleGenre, TitleGenre.title_id == Title.title_id)
         .join(Genre, Genre.genre_id == TitleGenre.genre_id)
-        .group_by(StreamingService.service_name, Genre.genre_name)
+        .group_by(genre_category)
         .order_by(func.count(distinct(Title.title_id)).desc())
     )
 
@@ -234,6 +385,135 @@ def fetch_country_distribution(filters: FilterState | None) -> pd.DataFrame:
     return _execute_statement(stmt)
 
 
+def fetch_country_diversity_by_service(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            func.count(distinct(Country.country_id)).label("country_count"),
+        )
+        .select_from(Title)
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .join(TitleCountry, TitleCountry.title_id == Title.title_id)
+        .join(Country, Country.country_id == TitleCountry.country_id)
+        .group_by(StreamingService.service_name)
+        .order_by(func.count(distinct(Country.country_id)).desc())
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    return _execute_statement(stmt)
+
+
+def fetch_genre_uniqueness(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+    genre_category = _genre_category_case().label("genre_category")
+
+    base = (
+        select(
+            StreamingService.service_name.label("service_name"),
+            Title.title_id.label("title_id"),
+            genre_category,
+        )
+        .select_from(Title)
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(
+            StreamingService,
+            StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id,
+        )
+        .join(TitleGenre, TitleGenre.title_id == Title.title_id)
+        .join(Genre, Genre.genre_id == TitleGenre.genre_id)
+    )
+
+    if conditions:
+        base = base.where(and_(*conditions))
+
+    genre_mapped = base.cte("genre_mapped")
+
+    genre_service_counts = (
+        select(
+            genre_mapped.c.service_name,
+            genre_mapped.c.genre_category,
+            func.count(distinct(genre_mapped.c.title_id)).label("title_count"),
+        )
+        .group_by(genre_mapped.c.service_name, genre_mapped.c.genre_category)
+    ).cte("genre_service_counts")
+
+    genre_totals = (
+        select(
+            genre_service_counts.c.genre_category,
+            func.sum(genre_service_counts.c.title_count).label("genre_total_titles"),
+        )
+        .group_by(genre_service_counts.c.genre_category)
+    ).cte("genre_totals")
+
+    service_totals = (
+        select(
+            genre_service_counts.c.service_name,
+            func.sum(genre_service_counts.c.title_count).label("service_total_titles"),
+        )
+        .group_by(genre_service_counts.c.service_name)
+    ).cte("service_totals")
+
+    with_shares = (
+        select(
+            genre_service_counts.c.service_name,
+            genre_service_counts.c.genre_category,
+            genre_service_counts.c.title_count,
+            genre_totals.c.genre_total_titles,
+            service_totals.c.service_total_titles,
+            (
+                genre_service_counts.c.title_count * 1.0 / genre_totals.c.genre_total_titles
+            ).label("dominance_share"),
+            (
+                genre_service_counts.c.title_count * 1.0 / service_totals.c.service_total_titles
+            ).label("service_share"),
+        )
+        .join(
+            genre_totals,
+            genre_service_counts.c.genre_category == genre_totals.c.genre_category,
+        )
+        .join(
+            service_totals,
+            genre_service_counts.c.service_name == service_totals.c.service_name,
+        )
+    ).cte("with_shares")
+
+    ranked = (
+        select(
+            with_shares.c.service_name,
+            with_shares.c.genre_category,
+            with_shares.c.title_count,
+            func.round(with_shares.c.dominance_share * 100, 1).label("dominance_share_pct"),
+            func.round(with_shares.c.service_share * 100, 1).label("service_share_pct"),
+            func.row_number()
+            .over(
+                partition_by=with_shares.c.service_name,
+                order_by=with_shares.c.dominance_share.desc(),
+            )
+            .label("rn"),
+        )
+    ).cte("ranked")
+
+    stmt = (
+        select(
+            ranked.c.service_name,
+            ranked.c.genre_category,
+            ranked.c.title_count,
+            ranked.c.dominance_share_pct,
+            ranked.c.service_share_pct,
+            ranked.c.rn,
+        )
+        .where(ranked.c.rn <= 5)
+        .order_by(ranked.c.service_name, ranked.c.dominance_share_pct.desc())
+    )
+
+    return _execute_statement(stmt)
+
+
 def fetch_release_year_trend(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
 
@@ -253,6 +533,53 @@ def fetch_release_year_trend(filters: FilterState | None) -> pd.DataFrame:
         stmt = stmt.where(and_(*conditions))
 
     return _execute_statement(stmt)
+
+
+def fetch_rating_distribution(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+    rating_bucket = _rating_bucket_expression()
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            rating_bucket.label("rating_bucket"),
+            func.count(distinct(Title.title_id)).label("title_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .group_by(StreamingService.service_name, rating_bucket)
+        .order_by(StreamingService.service_name, rating_bucket)
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    return _execute_statement(stmt)
+
+
+def fetch_maturity_mix(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+    maturity_bucket = _maturity_bucket_expression()
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            maturity_bucket.label("content_group"),
+            func.count(distinct(Title.title_id)).label("title_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .group_by(StreamingService.service_name, maturity_bucket)
+        .order_by(StreamingService.service_name, maturity_bucket)
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    df = _execute_statement(stmt)
+    if not df.empty:
+        df["share"] = df.groupby("service_name")["title_count"].transform(lambda series: series / series.sum())
+    return df
 
 
 def fetch_date_added_trend(filters: FilterState | None) -> pd.DataFrame:

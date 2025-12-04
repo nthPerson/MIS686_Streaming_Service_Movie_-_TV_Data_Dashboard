@@ -28,6 +28,7 @@ class Title(Base):
     description = Column(Text)
     release_year = Column(Integer, nullable=False)
     content_type = Column(String(10), nullable=False)
+    age_rating_code = Column(String(20))
     runtime_minutes = Column(SmallInteger)
     num_seasons = Column(SmallInteger)
 
