@@ -22,7 +22,7 @@ def _render_sidebar_navigation(user_role: str) -> None:
     st.sidebar.divider()
     st.sidebar.subheader("Navigate")
     if hasattr(st.sidebar, "page_link"):
-        st.sidebar.page_link("app.py", label="Landing questions", icon="🏠")
+        st.sidebar.page_link("app.py", label="Analytical Questions", icon="🏠")
         st.sidebar.page_link(
             "pages/05_High_Level_Analytics.py",
             label="High-Level Analytics",
