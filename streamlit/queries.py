@@ -21,6 +21,11 @@ from models import (
     TitleGenre,
 )
 
+_RATING_G = ("G", "TV-G", "TV-Y", "Y")
+_RATING_PG = ("PG", "TV-PG", "TV-Y7", "TV-Y7-FV")
+_RATING_PG13 = ("PG-13", "TV-14")
+_RATING_R = ("R", "NC-17", "TV-MA")
+
 
 def _to_dataframe(rows: list[dict]) -> pd.DataFrame:
     if not rows:
@@ -134,6 +139,26 @@ def _build_filters(
     return conditions
 
 
+def _rating_bucket_expression():
+    rating_upper = func.upper(Title.age_rating_code)
+    return case(
+        (rating_upper.in_(_RATING_G), "G"),
+        (rating_upper.in_(_RATING_PG), "PG"),
+        (rating_upper.in_(_RATING_PG13), "PG-13"),
+        (rating_upper.in_(_RATING_R), "R/TV-MA"),
+        else_="Unrated/Other",
+    )
+
+
+def _maturity_bucket_expression():
+    rating_upper = func.upper(Title.age_rating_code)
+    return case(
+        (rating_upper.in_(_RATING_G + _RATING_PG), "Family (G/PG)"),
+        (rating_upper.in_(_RATING_PG13 + _RATING_R), "Mature (PG-13+/R)"),
+        else_="Other / Unrated",
+    )
+
+
 def fetch_overview_metrics(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
 
@@ -234,6 +259,65 @@ def fetch_country_distribution(filters: FilterState | None) -> pd.DataFrame:
     return _execute_statement(stmt)
 
 
+def fetch_country_diversity_by_service(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            func.count(distinct(Country.country_id)).label("country_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .join(TitleCountry, TitleCountry.title_id == Title.title_id)
+        .join(Country, Country.country_id == TitleCountry.country_id)
+        .group_by(StreamingService.service_name)
+        .order_by(func.count(distinct(Country.country_id)).desc())
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    return _execute_statement(stmt)
+
+
+def fetch_genre_uniqueness(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+
+    base = (
+        select(
+            StreamingService.service_name.label("service_name"),
+            Genre.genre_name.label("genre_name"),
+            func.count(distinct(Title.title_id)).label("title_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .join(TitleGenre, TitleGenre.title_id == Title.title_id)
+        .join(Genre, Genre.genre_id == TitleGenre.genre_id)
+        .group_by(StreamingService.service_name, Genre.genre_name)
+    )
+
+    if conditions:
+        base = base.where(and_(*conditions))
+
+    subquery = base.subquery()
+
+    stmt = (
+        select(
+            subquery.c.genre_name,
+            subquery.c.service_name,
+            subquery.c.title_count,
+            (
+                subquery.c.title_count
+                / func.sum(subquery.c.title_count).over(partition_by=subquery.c.genre_name)
+            ).label("service_share"),
+        )
+        .order_by(subquery.c.genre_name, subquery.c.service_name)
+    )
+
+    return _execute_statement(stmt)
+
+
 def fetch_release_year_trend(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
 
@@ -253,6 +337,53 @@ def fetch_release_year_trend(filters: FilterState | None) -> pd.DataFrame:
         stmt = stmt.where(and_(*conditions))
 
     return _execute_statement(stmt)
+
+
+def fetch_rating_distribution(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+    rating_bucket = _rating_bucket_expression()
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            rating_bucket.label("rating_bucket"),
+            func.count(distinct(Title.title_id)).label("title_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .group_by(StreamingService.service_name, rating_bucket)
+        .order_by(StreamingService.service_name, rating_bucket)
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    return _execute_statement(stmt)
+
+
+def fetch_maturity_mix(filters: FilterState | None = None) -> pd.DataFrame:
+    conditions = _build_filters(filters)
+    maturity_bucket = _maturity_bucket_expression()
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            maturity_bucket.label("content_group"),
+            func.count(distinct(Title.title_id)).label("title_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .group_by(StreamingService.service_name, maturity_bucket)
+        .order_by(StreamingService.service_name, maturity_bucket)
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    df = _execute_statement(stmt)
+    if not df.empty:
+        df["share"] = df.groupby("service_name")["title_count"].transform(lambda series: series / series.sum())
+    return df
 
 
 def fetch_date_added_trend(filters: FilterState | None) -> pd.DataFrame:
