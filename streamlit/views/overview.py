@@ -15,6 +15,7 @@ def render(filters: FilterState | None) -> None:
         st.info("No titles match the selected filters.")
         return
 
+    st.subheader("Platform Catalog Overview")
     metrics = metrics_df.iloc[0].to_dict()
     metric_columns = st.columns(4)
     metric_columns[0].metric("Total Titles", f"{int(metrics['total_titles']):,}")
@@ -22,9 +23,6 @@ def render(filters: FilterState | None) -> None:
     metric_columns[2].metric("TV Shows", f"{int(metrics['tv_show_count']):,}")
     metric_columns[3].metric("Genres", f"{int(metrics['distinct_genres']):,}")
 
-    st.divider()
-
-    st.subheader("Platform Catalog Mix")
     platform_df = queries.fetch_platform_breakdown(filters)
     if platform_df.empty:
         st.warning("No platform data available for the current filters.")
@@ -47,14 +45,18 @@ def render(filters: FilterState | None) -> None:
     )
     st.plotly_chart(fig, use_container_width=True)
 
+    table_df = platform_df.rename(
+        columns={
+            "service_name": "Platform",
+            "total_titles": "Titles",
+            "movie_count": "Movies",
+            "tv_show_count": "TV Shows",
+        }
+    )
+    desired_columns = ["Platform", "Titles", "Movies", "TV Shows"]
+    table_df = table_df[[col for col in desired_columns if col in table_df.columns]]
+
     st.dataframe(
-        platform_df.rename(
-            columns={
-                "service_name": "Platform",
-                "total_titles": "Titles",
-                "movie_count": "Movies",
-                "tv_show_count": "TV Shows",
-            }
-        ),
+        table_df,
         use_container_width=True,
     )
