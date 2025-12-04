@@ -267,6 +267,7 @@ def fetch_country_diversity_by_service(filters: FilterState | None = None) -> pd
             StreamingService.service_name,
             func.count(distinct(Country.country_id)).label("country_count"),
         )
+        .select_from(Title)
         .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
         .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
         .join(TitleCountry, TitleCountry.title_id == Title.title_id)

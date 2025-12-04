@@ -223,8 +223,8 @@ def _render_q2() -> None:
         x="service_name",
         y="Titles",
         color="Content Type",
-        barnorm="percent",
-        labels={"service_name": "Platform", "Titles": "Catalog share (%)"},
+        # barnorm="percent",
+        labels={"service_name": "Platform", "Titles": "Catalog share (count)"},
         title="Relative movie vs TV share (100% stacked)",
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -370,9 +370,12 @@ def _render_q6() -> None:
         )
         fig.update_layout(yaxis_tickformat="%", xaxis_tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
+        table_df = filtered.copy()
+        table_df["service_share"] = pd.to_numeric(table_df["service_share"], errors="coerce")
+        table_df = table_df.assign(share_pct=lambda df_: (df_["service_share"] * 100).round(1))
         st.dataframe(
-            filtered.assign(service_share=lambda df_: (df_["service_share"] * 100).round(1)).rename(
-                columns={"service_share": "Share (%)", "service_name": "Service"}
+            table_df.rename(columns={"share_pct": "Share (%)", "service_name": "Service"}).drop(
+                columns=["service_share"], errors="ignore"
             ),
             use_container_width=True,
             hide_index=True,
@@ -413,10 +416,10 @@ def _render_q7() -> None:
         x="service_name",
         y="title_count",
         color="rating_bucket",
-        barnorm="percent",
+        # barnorm="percent",
         labels={
             "service_name": "Platform",
-            "title_count": "Catalog share (%)",
+            "title_count": "Catalog share (count)",
             "rating_bucket": "Rating bucket",
         },
         title="Rating mix per service",
@@ -462,10 +465,10 @@ def _render_q8() -> None:
         x="service_name",
         y="title_count",
         color="content_group",
-        barnorm="percent",
+        # barnorm="percent",
         labels={
             "service_name": "Platform",
-            "title_count": "Catalog share (%)",
+            "title_count": "Catalog share (count)",
             "content_group": "Content grouping",
         },
         title="Family vs. mature mixes",
