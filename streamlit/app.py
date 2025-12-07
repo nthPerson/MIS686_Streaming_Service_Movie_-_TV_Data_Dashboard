@@ -52,7 +52,7 @@ def run() -> None:
     get_settings()
     _render_sidebar_navigation(user.role)
 
-    st.title("Streaming Media Intelligence Dashboard")
+    st.title("Streaming Platform Content Analytics Dashboard")
     st.caption("Landing hub for the course's eight analytical questions.")
 
     status_col, action_col = st.columns([3, 1])

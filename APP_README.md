@@ -42,7 +42,7 @@ Key characteristics:
    DB_USER=your_user
    DB_PASSWORD=your_password
    DB_NAME=streaming_media_db
-   STREAMLIT_TITLE=Streaming Media Intelligence Dashboard
+   STREAMLIT_TITLE=Streaming Platform Content Analytics Dashboard
    ```
 
 ## Running the Dashboard
