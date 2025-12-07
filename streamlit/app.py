@@ -22,27 +22,38 @@ def _render_sidebar_navigation(user_role: str) -> None:
     st.sidebar.divider()
     st.sidebar.subheader("Navigate")
     if hasattr(st.sidebar, "page_link"):
-        st.sidebar.page_link("app.py", label="Analytical Questions", icon="🏠")
-        st.sidebar.page_link(
-            "pages/05_High_Level_Analytics.py",
-            label="High-Level Analytics",
-            icon="📊",
-        )
-        st.sidebar.page_link(
-            "pages/02_Viewer_Platform.py",
-            label="Viewer Platform Comparison",
-            icon="🎯",
-        )
-        st.sidebar.page_link(
-            "pages/03_Analyst_Advanced.py",
-            label="Analyst Advanced Analytics",
-            icon="🧮",
-        )
-        st.sidebar.page_link(
-            "pages/04_Admin_Control.py",
-            label="Admin Control Center",
-            icon="🛠️",
-        )
+        links = [
+            {"page": "app.py", "label": "Analytical Questions", "icon": "🏠", "roles": None},
+            {
+                "page": "pages/05_High_Level_Analytics.py",
+                "label": "High-Level Analytics",
+                "icon": "📊",
+                "roles": None,
+            },
+            {
+                "page": "pages/02_Viewer_Platform.py",
+                "label": "Viewer Platform Comparison",
+                "icon": "🎯",
+                "roles": ["viewer"],
+            },
+            {
+                "page": "pages/03_Analyst_Advanced.py",
+                "label": "Analyst Advanced Analytics",
+                "icon": "🧮",
+                "roles": ["analyst"],
+            },
+            {
+                "page": "pages/04_Admin_Control.py",
+                "label": "Admin Control Center",
+                "icon": "🛠️",
+                "roles": ["admin"],
+            },
+        ]
+
+        for link in links:
+            allowed_roles = link.get("roles")
+            if user_role == "admin" or allowed_roles is None or user_role in allowed_roles:
+                st.sidebar.page_link(link["page"], label=link["label"], icon=link["icon"])
     st.sidebar.caption(f"Current role: **{user_role}**")
 
 
