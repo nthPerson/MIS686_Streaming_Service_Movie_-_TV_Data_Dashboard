@@ -10,7 +10,7 @@ The dashboard analyzes combined catalogs from Netflix, Amazon Prime Video, Hulu,
 - **Transparent SQL**: question cards expose the underlying queries and interpretations alongside each visualization.
 
 ## Data foundation
-- Normalized MySQL schema defined in `documents/database/DATABASE_SCHEMA.md` and DDLs (`documents/tv_movie_DDL.sql`).
+- MySQL schema defined in `documents/database/DATABASE_SCHEMA.md` and DDLs (`documents/tv_movie_DDL.sql`).
 - ETL pipeline (`data_wrangling/etl_streaming_titles.py`) loads the four CSV catalogs into core tables (titles, genres, countries, people/roles, streaming availability).
 - Central query layer in `streamlit/queries.py` supplies all views; `streamlit/db.py` handles pooled connections for pandas DataFrames.
 
@@ -19,4 +19,4 @@ The dashboard analyzes combined catalogs from Netflix, Amazon Prime Video, Hulu,
 - High-Level analytics: aggregated KPIs and charts without role restrictions.
 - Viewer/Analyst/Admin dashboards: tailored navigation and controls per role, surfaced through the sidebar and maintained in session state.
 
-For setup and ETL instructions, see `APP_SETUP_README.md`. To launch the app locally, run `streamlit run streamlit/app.py` after configuration.
+For setup and ETL instructions, see [APP_SETUP_README.md](APP_SETUP_README.md). To launch the app locally, run `streamlit run streamlit/app.py` after configuration.
