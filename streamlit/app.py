@@ -8,21 +8,33 @@ import streamlit as st
 
 from config import get_settings
 from views import admin_dashboard, analyst_dashboard, auth_page, high_level, overview, questions, viewer_dashboard
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 def _render_about_sidebar() -> None:
-    st.sidebar.title("About this Dashboard")
-    st.sidebar.write(
-        "A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions."
-    )
-    st.sidebar.divider()
+    with st.sidebar:
+        APP_DIR = Path(__file__).resolve().parent  # Get the parent directory of this file
+        LOGO_PATH = APP_DIR / "movie_monkies_logo.png"
+        st.image(str(LOGO_PATH), width='stretch')
+        
+        st.title("About this Dashboard")
+        st.write(
+            "To discover analytical insights related to movies and TV shows offered by Amazon Prime Video, Netlix, Hulu, and Disney+: "
+            "\n- Browse the eight analytical questions"
+            "\n- Change visualization filters for dynamic data analysis"
+            "\n- Click the 'SQL Query' dropdowns to see the queries powering this dashboard"
+            "\n- Click the 'Answer / Interpretation' drowpdowns for detailed responses to each analytical question"
+            "\n- Browse user role-specific pages below for additional insights, analysis, or administative controls"
+        )
+        st.divider()
 
 
 def _render_home() -> None:
     st.title("Streaming Platform Content Analytics Dashboard")
-    st.caption("Landing hub for the course's eight analytical questions.")
+    st.markdown("###### A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions.")
+    # st.caption("A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions.")
     overview.render(None)
     st.divider()
     questions.render_all()
