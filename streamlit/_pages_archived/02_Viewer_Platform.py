@@ -47,9 +47,9 @@ fig = px.bar(
 )
 fig.update_layout(xaxis_title="Platform", yaxis_title="Titles")
 
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
-st.dataframe(pivot_df.rename(columns={"service_name": "Platform"}), use_container_width=True)
+st.dataframe(pivot_df.rename(columns={"service_name": "Platform"}), width='stretch')
 
 st.success(f"You are viewing the viewer workspace, {user.username}.")
 if hasattr(st, "page_link"):

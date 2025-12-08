@@ -517,7 +517,7 @@ def _render_q1() -> None:
         labels={"service_name": "Platform", "total_titles": "Titles"},
         title="Total titles per service",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     table_df = filtered.rename(
         columns={
             "service_name": "Service",
@@ -531,7 +531,7 @@ def _render_q1() -> None:
 
     st.dataframe(
         table_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
     )
 
@@ -580,7 +580,7 @@ def _render_q2() -> None:
         labels={"service_name": "Platform", "Titles": "Catalog share (count)"},
         title="Relative movie vs TV share (100% stacked)",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("SQL query"):
         st.code(Q2_SQL, language="sql")
@@ -619,7 +619,7 @@ def _render_q3() -> None:
         labels={"service_name": "Platform", "country_count": "Countries"},
         title="Distinct production countries per service",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("SQL query"):
         st.code(Q3_SQL, language="sql")
@@ -649,7 +649,7 @@ def _render_q4() -> None:
         title=f"Top {top_n} contributing countries",
     )
     fig.update_layout(yaxis=dict(autorange="reversed"))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("SQL query"):
         st.code(Q4_SQL, language="sql")
@@ -682,7 +682,7 @@ def _render_q5() -> None:
         title=f"Top {top_n} genres across all services",
     )
     fig.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("SQL query"):
         st.code(Q5_SQL, language="sql")
@@ -756,7 +756,7 @@ def _render_q6() -> None:
         title="Top genre differentiators per service",
     )
     fig.update_layout(xaxis=dict(ticksuffix="%"))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     table_df = (
         filtered.rename(
@@ -773,7 +773,7 @@ def _render_q6() -> None:
     )
     st.dataframe(
         table_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
     )
 
@@ -822,7 +822,7 @@ def _render_q7() -> None:
         },
         title="Rating mix per service",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     filtered["share"] = filtered.groupby("service_name")["title_count"].transform(lambda s: s / s.sum())
 
@@ -874,7 +874,7 @@ def _render_q8() -> None:
         },
         title="Family vs. mature mixes",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("SQL query"):
         st.code(Q8_SQL, language="sql")

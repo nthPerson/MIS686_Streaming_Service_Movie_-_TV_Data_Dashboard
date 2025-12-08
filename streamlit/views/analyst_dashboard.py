@@ -86,8 +86,8 @@ def render() -> None:
             labels=dict(x="Genre", y="Platform", color="Titles"),
             title="Genre density heatmap",
         )
-        st.plotly_chart(fig_heatmap, use_container_width=True)
-        st.dataframe(heatmap_df, use_container_width=True)
+        st.plotly_chart(fig_heatmap, width='stretch')
+        st.dataframe(heatmap_df, width='stretch')
 
     st.subheader("Content additions over time")
     trend_df = queries.fetch_date_added_trend(filters)
@@ -103,10 +103,10 @@ def render() -> None:
             labels={"month_bucket": "Month", "title_count": "Titles", "service_name": "Platform"},
             title="Monthly additions",
         )
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, width='stretch')
 
     st.subheader("Recent catalog entries")
     table_df = queries.fetch_titles_table(filters, limit=100)
-    st.dataframe(table_df, use_container_width=True)
+    st.dataframe(table_df, width='stretch')
 
     st.success(f"Analyst workspace unlocked for {user.username}.")

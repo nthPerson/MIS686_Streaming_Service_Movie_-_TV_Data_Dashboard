@@ -38,7 +38,7 @@ else:
                 "last_login_at": "Last Login",
             }
         ),
-        use_container_width=True,
+        width='stretch',
     )
 
 col_add, col_role, col_status, col_delete = st.columns(4)
@@ -124,7 +124,7 @@ audits_df = pd.DataFrame(audits)
 if audits_df.empty:
     st.info("No audit records found.")
 else:
-    st.dataframe(audits_df, use_container_width=True)
+    st.dataframe(audits_df, width='stretch')
 
 st.success(f"Admin privileges verified for {user.username}.")
 if hasattr(st, "page_link"):
