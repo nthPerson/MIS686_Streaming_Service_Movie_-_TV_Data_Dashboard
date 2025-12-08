@@ -3,13 +3,25 @@
 from __future__ import annotations
 
 import streamlit as st
+from pathlib import Path
 
 from auth import authenticate_user, list_roles, register_user
 
 
 def render() -> None:
-    st.title("Account Access")
-    st.caption("Create a toy account or log in with existing credentials.")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.header("Welcome to our login page!", divider="gray")
+
+    with col2:
+        # st.header("Welcome to our login page!", divider="gray")
+        APP_DIR = Path(__file__).resolve().parent.parent  # Get the parent directory of this file
+        LOGO_PATH = APP_DIR / "movie_monkies_logo.png"
+        st.image(str(LOGO_PATH), width=150)  
+
+    st.markdown("### Please log in or create an account below:")
+    st.caption("Create an account using the 'Sign Up' tab or log in with existing credentials on the 'Log In' tab.")
 
     login_tab, signup_tab = st.tabs(["Log In", "Sign Up"])
 

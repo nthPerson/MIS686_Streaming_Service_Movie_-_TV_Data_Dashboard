@@ -96,7 +96,7 @@ def run() -> None:
     user = st.session_state.get("current_user")
     if not user:
         st.session_state["current_page"] = "access"
-        _render_about_sidebar()
+        # _render_about_sidebar()
         auth_page.render()
         return
 
