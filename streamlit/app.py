@@ -37,7 +37,7 @@ def _render_home_about() -> None:
 
 def _render_home() -> None:
     st.title("Streaming Platform Content Analytics Dashboard")
-    st.markdown("###### A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions.")
+    st.markdown("###### A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions. Visit the project on GitHub: [MIS686 Streaming Service Dashboard](https://github.com/nthPerson/MIS686_Streaming_Service_Movie_-_TV_Data_Dashboard)")
     # st.caption("A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions.")
     overview.render(None)
     st.divider()
