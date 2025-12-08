@@ -91,6 +91,13 @@ def _render_user_status(user) -> None:
             st.rerun()
 
 
+def _maybe_reroute(current_key: str, chosen_key: str) -> None:
+    """If navigation selection changes, update state and rerun immediately."""
+    if chosen_key != current_key:
+        st.session_state["current_page"] = chosen_key
+        st.rerun()
+
+
 def run() -> None:
     st.set_page_config(page_title="Streaming Market Intelligence", layout="wide")
     if "current_page" not in st.session_state:
@@ -109,7 +116,8 @@ def run() -> None:
     if active_page == "home":
         _render_logo()
         _render_home_about()
-        active_page = _render_sidebar_navigation(user.role)
+        chosen = _render_sidebar_navigation(user.role)
+        _maybe_reroute(active_page, chosen)
         _render_user_status(user)
         _render_home()
     elif active_page == "high_level":
@@ -117,13 +125,15 @@ def run() -> None:
         _render_user_status(user)
         high_level.render()
         # st.sidebar.divider()
-        active_page = _render_sidebar_navigation(user.role)
+        chosen = _render_sidebar_navigation(user.role)
+        _maybe_reroute(active_page, chosen)
     elif active_page == "viewer":
         _render_logo()
         with st.sidebar:
             st.info("No filters required for this page. Use the navigation below to explore other views.")
             st.divider()
-        active_page = _render_sidebar_navigation(user.role)
+        chosen = _render_sidebar_navigation(user.role)
+        _maybe_reroute(active_page, chosen)
         _render_user_status(user)
         viewer_dashboard.render()
     elif active_page == "analyst":
@@ -132,7 +142,8 @@ def run() -> None:
             st.subheader("Filters")
             st.write("Filters are configured within this page's controls.")
             st.divider()
-        active_page = _render_sidebar_navigation(user.role)
+        chosen = _render_sidebar_navigation(user.role)
+        _maybe_reroute(active_page, chosen)
         _render_user_status(user)
         analyst_dashboard.render()
     elif active_page == "admin":
@@ -140,7 +151,8 @@ def run() -> None:
         with st.sidebar:
             st.info("No filters required for this page. Use the navigation below to explore other views.")
             st.divider()
-        active_page = _render_sidebar_navigation(user.role)
+        chosen = _render_sidebar_navigation(user.role)
+        _maybe_reroute(active_page, chosen)
         _render_user_status(user)
         admin_dashboard.render()
     else:
