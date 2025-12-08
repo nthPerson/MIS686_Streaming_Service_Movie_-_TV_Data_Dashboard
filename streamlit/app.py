@@ -47,9 +47,9 @@ def _render_home() -> None:
 NAV_PAGES = {
     "home": {"label": "Analytical Questions", "icon": "🏠", "roles": None, "render": _render_home},
     "high_level": {"label": "High-Level Analytics", "icon": "📊", "roles": None, "render": high_level.render},
-    "viewer": {"label": "Viewer Platform Comparison", "icon": "🎯", "roles": ["viewer"], "render": viewer_dashboard.render},
-    "analyst": {"label": "Analyst Advanced Analytics", "icon": "🧮", "roles": ["analyst"], "render": analyst_dashboard.render},
-    "admin": {"label": "Admin Control Center", "icon": "🛠️", "roles": ["admin"], "render": admin_dashboard.render},
+    "viewer": {"label": "Platform Comparison (Viewer)", "icon": "🎯", "roles": ["viewer"], "render": viewer_dashboard.render},
+    "analyst": {"label": "Advanced Analytics (Analyst)", "icon": "🧮", "roles": ["analyst"], "render": analyst_dashboard.render},
+    "admin": {"label": "Control Center (Admin)", "icon": "🛠️", "roles": ["admin"], "render": admin_dashboard.render},
 }
 
 
