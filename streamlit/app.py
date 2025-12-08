@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 def _render_sidebar_navigation(user_role: str) -> None:
     st.sidebar.title("About this Dashboard")
     st.sidebar.write(
-        "Answer eight course-driven analytical questions covering platform scale, "
-        "geographies, genres, and maturity ratings."
+        "A multi-dimensional comparison of catalog size, genre distribution, geographic diversity, and maturity profiles of four major streaming services, analyzed through eight analytical questions."
     )
     st.sidebar.divider()
     st.sidebar.subheader("Navigate")
