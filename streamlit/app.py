@@ -32,7 +32,7 @@ def _render_home_about() -> None:
             "\n- Click the 'Answer / Interpretation' drowpdowns for detailed responses to each analytical question"
             "\n- Browse user role-specific pages below for additional insights, analysis, or administative controls"
         )
-        st.divider()
+        # st.divider()
 
 
 def _render_home() -> None:
