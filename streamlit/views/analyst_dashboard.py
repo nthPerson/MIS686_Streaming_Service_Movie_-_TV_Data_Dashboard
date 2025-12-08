@@ -68,13 +68,14 @@ def render() -> None:
         st.metric("Date Added", f"{filters.date_added_range[0]} → {filters.date_added_range[1]}")
 
     st.subheader("Genre saturation by platform")
-    genre_df = queries.fetch_genre_distribution(filters)
+    genre_df = queries.fetch_genre_distribution_by_service(filters)
     if genre_df.empty:
         st.warning("No data for the selected filters.")
     else:
+        genre_col = "genre_name" if "genre_name" in genre_df.columns else "genre_category"
         heatmap_df = genre_df.pivot_table(
             index="service_name",
-            columns="genre_name",
+            columns=genre_col,
             values="title_count",
             aggfunc="sum",
             fill_value=0,

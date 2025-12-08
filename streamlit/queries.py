@@ -364,6 +364,32 @@ def fetch_genre_distribution(filters: FilterState | None) -> pd.DataFrame:
     return _execute_statement(stmt)
 
 
+def fetch_genre_distribution_by_service(filters: FilterState | None) -> pd.DataFrame:
+    """Genre distribution broken down by streaming service."""
+
+    conditions = _build_filters(filters)
+    genre_category = _genre_category_case().label("genre_category")
+
+    stmt = (
+        select(
+            StreamingService.service_name,
+            genre_category,
+            func.count(distinct(Title.title_id)).label("title_count"),
+        )
+        .join(StreamingAvailability, StreamingAvailability.title_id == Title.title_id)
+        .join(StreamingService, StreamingService.streaming_service_id == StreamingAvailability.streaming_service_id)
+        .join(TitleGenre, TitleGenre.title_id == Title.title_id)
+        .join(Genre, Genre.genre_id == TitleGenre.genre_id)
+        .group_by(StreamingService.service_name, genre_category)
+        .order_by(StreamingService.service_name, func.count(distinct(Title.title_id)).desc())
+    )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    return _execute_statement(stmt)
+
+
 def fetch_country_distribution(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
 
