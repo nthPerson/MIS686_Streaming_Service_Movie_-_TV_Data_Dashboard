@@ -9,7 +9,8 @@ from auth import authenticate_user, list_roles, register_user
 
 
 def render() -> None:
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([0.8, 0.2])
+    # col1, col2 = st.columns(2)
 
     with col1:
         st.header("Welcome to our login page!", divider="gray")
@@ -18,7 +19,8 @@ def render() -> None:
         # st.header("Welcome to our login page!", divider="gray")
         APP_DIR = Path(__file__).resolve().parent.parent  # Get the parent directory of this file
         LOGO_PATH = APP_DIR / "movie_monkies_logo.png"
-        st.image(str(LOGO_PATH), width=150)  
+        st.image(str(LOGO_PATH), width=200)  
+        # st.image(str(LOGO_PATH), width=150)  
 
     st.markdown("### Please log in or create an account below:")
     st.caption("Create an account using the 'Sign Up' tab or log in with existing credentials on the 'Log In' tab.")
