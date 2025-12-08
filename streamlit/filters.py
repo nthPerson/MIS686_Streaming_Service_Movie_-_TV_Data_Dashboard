@@ -53,7 +53,7 @@ def render_sidebar_filters(options: FilterOptions | None = None) -> FilterState:
     """Render sidebar inputs and return the resulting selections."""
 
     opts = options or FilterOptions.empty()
-    st.sidebar.header("Filters")
+    # st.sidebar.header("Filters")
 
     services = st.sidebar.multiselect(
         "Streaming services",

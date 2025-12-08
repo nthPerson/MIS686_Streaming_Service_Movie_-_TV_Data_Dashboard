@@ -15,11 +15,12 @@ def render(filters: FilterState | None) -> None:
     if genre_df.empty:
         st.info("No genre data for the selected filters.")
     else:
+        name_col = "genre_name" if "genre_name" in genre_df.columns else "genre_category"
         genre_summary = (
-            genre_df.groupby("genre_name", as_index=False)["title_count"].sum().sort_values("title_count", ascending=False).head(12)
+            genre_df.groupby(name_col, as_index=False)["title_count"].sum().sort_values("title_count", ascending=False).head(12)
         )
         fig, ax = plt.subplots(figsize=(8, 5))
-        ax.barh(genre_summary["genre_name"], genre_summary["title_count"], color="#4C78A8")
+        ax.barh(genre_summary[name_col], genre_summary["title_count"], color="#4C78A8")
         ax.set_xlabel("Titles")
         ax.invert_yaxis()
         ax.grid(axis="x", linestyle="--", alpha=0.4)

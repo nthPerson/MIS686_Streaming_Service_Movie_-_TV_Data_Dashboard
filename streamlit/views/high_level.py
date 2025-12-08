@@ -20,9 +20,8 @@ def _load_filter_options():
     return queries.fetch_filter_options()
 
 
-def _render_sidebar(settings_summary: str) -> FilterState | None:
+def _render_sidebar() -> FilterState | None:
     st.sidebar.title("Filters")
-    st.sidebar.caption(settings_summary)
     try:
         filter_options = _load_filter_options()
     except Exception as exc:  # pragma: no cover - bubbled to UI
@@ -34,10 +33,11 @@ def _render_sidebar(settings_summary: str) -> FilterState | None:
 
 def render() -> None:
     user = require_user()
-    settings = get_settings()
+    # Ensure settings are loaded without surfacing connection details in the UI sidebar
+    get_settings()
 
     try:
-        filters = _render_sidebar(settings.settings_summary())
+        filters = _render_sidebar()
     except Exception as exc:  # pragma: no cover - surfaced to UI
         logger.exception("Failed to initialize sidebar filters")
         st.error("Failed to initialize sidebar filters.")

@@ -12,13 +12,17 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+APP_DIR = Path(__file__).resolve().parent
+LOGO_PATH = APP_DIR / "movie_monkies_logo.png"
 
-def _render_about_sidebar() -> None:
+
+def _render_logo() -> None:
     with st.sidebar:
-        APP_DIR = Path(__file__).resolve().parent  # Get the parent directory of this file
-        LOGO_PATH = APP_DIR / "movie_monkies_logo.png"
         st.image(str(LOGO_PATH), width='stretch')
-        
+
+
+def _render_home_about() -> None:
+    with st.sidebar:
         st.title("About this Dashboard")
         st.write(
             "To discover analytical insights related to movies and TV shows offered by Amazon Prime Video, Netlix, Hulu, and Disney+: "
@@ -50,8 +54,7 @@ NAV_PAGES = {
 
 
 def _render_sidebar_navigation(user_role: str) -> str:
-    _render_about_sidebar()
-    st.sidebar.subheader("Navigate")
+    st.sidebar.header("Navigate")
 
     allowed_keys: list[str] = []
     labels: list[str] = []
@@ -101,13 +104,48 @@ def run() -> None:
         return
 
     get_settings()
-    active_page = _render_sidebar_navigation(user.role)
-    _render_user_status(user)
+    active_page = st.session_state.get("current_page", "home")
 
     if active_page == "home":
+        _render_logo()
+        _render_home_about()
+        active_page = _render_sidebar_navigation(user.role)
+        _render_user_status(user)
         _render_home()
+    elif active_page == "high_level":
+        _render_logo()
+        _render_user_status(user)
+        high_level.render()
+        # st.sidebar.divider()
+        active_page = _render_sidebar_navigation(user.role)
+    elif active_page == "viewer":
+        _render_logo()
+        with st.sidebar:
+            st.info("No filters required for this page. Use the navigation below to explore other views.")
+            st.divider()
+        active_page = _render_sidebar_navigation(user.role)
+        _render_user_status(user)
+        viewer_dashboard.render()
+    elif active_page == "analyst":
+        _render_logo()
+        with st.sidebar:
+            st.subheader("Filters")
+            st.write("Filters are configured within this page's controls.")
+            st.divider()
+        active_page = _render_sidebar_navigation(user.role)
+        _render_user_status(user)
+        analyst_dashboard.render()
+    elif active_page == "admin":
+        _render_logo()
+        with st.sidebar:
+            st.info("No filters required for this page. Use the navigation below to explore other views.")
+            st.divider()
+        active_page = _render_sidebar_navigation(user.role)
+        _render_user_status(user)
+        admin_dashboard.render()
     else:
-        NAV_PAGES[active_page]["render"]()
+        st.session_state["current_page"] = "home"
+        st.rerun()
 
 
 if __name__ == "__main__":
