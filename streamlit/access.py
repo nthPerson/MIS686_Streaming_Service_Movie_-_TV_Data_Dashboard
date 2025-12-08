@@ -10,14 +10,8 @@ from auth import AuthenticatedUser
 
 
 def _redirect_to_login() -> None:
-    if hasattr(st, "switch_page"):
-        try:
-            st.switch_page("pages/01_Login_Signup.py")
-            return
-        except Exception:
-            pass
-    st.info("Please log in to continue.")
-    st.stop()
+    st.session_state["current_page"] = "access"
+    st.rerun()
 
 
 def require_user(allowed_roles: Iterable[str] | None = None) -> AuthenticatedUser:
