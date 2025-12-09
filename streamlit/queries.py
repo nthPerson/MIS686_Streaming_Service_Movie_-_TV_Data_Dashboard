@@ -341,6 +341,38 @@ def fetch_platform_breakdown(filters: FilterState | None) -> pd.DataFrame:
     return _execute_statement(stmt)
 
 
+def fetch_titles_via_stored_procedure(filters: FilterState | None) -> pd.DataFrame:
+    """Call sp_get_titles_for_dashboard with supported sidebar filters."""
+
+    params = {
+        "p_service_name": None,
+        "p_content_type": None,
+        "p_release_year_start": None,
+        "p_release_year_end": None,
+    }
+
+    if filters:
+        if len(filters.services) == 1:
+            params["p_service_name"] = filters.services[0]
+        if len(filters.content_types) == 1:
+            params["p_content_type"] = filters.content_types[0]
+
+        release_start, release_end = filters.release_year_range
+        params["p_release_year_start"] = release_start
+        params["p_release_year_end"] = release_end
+
+    with get_session() as session:
+        result = session.execute(
+            text(
+                "CALL sp_get_titles_for_dashboard(:p_service_name, :p_content_type, :p_release_year_start, :p_release_year_end)"
+            ),
+            params,
+        )
+        rows = result.mappings().all()
+
+    return _to_dataframe(rows)
+
+
 def fetch_genre_distribution(filters: FilterState | None) -> pd.DataFrame:
     conditions = _build_filters(filters)
     genre_category = _genre_category_case().label("genre_category")
